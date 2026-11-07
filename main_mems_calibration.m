@@ -228,3 +228,7 @@ fprintf('  Bias instability: %.2f deg/h at tau = %.0f s\n', biEst*3600, tau(iMin
 fprintf('ATTITUDE ERROR after %d s\n', N/fs);
 fprintf('  raw %.2f deg | rate-table cal %.2f deg | + thermal MLP %.2f deg\n', attErr(:, end));
 fprintf('Figures saved to: %s\n', outDir);
+
+% Save the estimated calibration for main_sensor_fusion.m
+save(fullfile(outDir, 'calibration_params.mat'), 'Ka_hat', 'ba_hat', 'Kg_hat', 'bg25_hat', 'net');
+fprintf('Calibration saved to: %s\n', fullfile(outDir, 'calibration_params.mat'));
