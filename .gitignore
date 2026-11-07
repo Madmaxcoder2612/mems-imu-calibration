@@ -1,10 +1,17 @@
-# MATLAB temporary and generated files
+# MATLAB
 *.asv
 *.m~
 *.mex*
-slprj/
 *.autosave
+slprj/
+codegen/
 
-# Operating-system files
+# OS files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+
+   results/*.mat
