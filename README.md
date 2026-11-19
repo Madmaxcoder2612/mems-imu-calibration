@@ -1,8 +1,60 @@
-# MEMS IMU Calibration & System Identification (MATLAB)
+# MEMS IMU calibration and system identification (MATLAB)
+
+[![CI](https://github.com/Madmaxcoder2612/mems-imu-calibration/actions/workflows/ci.yml/badge.svg)](https://github.com/Madmaxcoder2612/mems-imu-calibration/actions/workflows/ci.yml)
+![MATLAB R2018b+](https://img.shields.io/badge/MATLAB-R2018b%2B-orange)
+![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![Status: simulation study](https://img.shields.io/badge/status-simulation%20study-orange)
 
 A simulation study of how a low-cost MEMS IMU is calibrated, characterised and fused into an orientation estimate: from classical least-squares calibration and a neural-network model of thermal drift to a comparison of five orientation filters, including an adaptive Kalman filter.
 
 The sensor errors are simulated from a known "true" model, so every estimate can be checked against ground truth. Everything is written in base MATLAB with no toolboxes: the least-squares and Levenberg-Marquardt solvers, the neural network, the Allan variance and all orientation filters are implemented from scratch.
+
+> **Simulation study.** All data is simulated from a known sensor model. The results show how the methods behave on that model, not on a real sensor. See [Limitations](#limitations).
+
+## Contents
+
+- [The pipeline](#the-pipeline)
+- [Results at a glance](#results-at-a-glance)
+- [What it covers](#what-it-covers)
+- [Sensor error model](#sensor-error-model)
+- [Calibration results](#calibration-results)
+- [Sensor fusion](#sensor-fusion)
+- [Figures](#figures)
+- [Quick start](#quick-start)
+- [How it works](#how-it-works)
+- [Repository layout](#repository-layout)
+- [Limitations](#limitations)
+- [Next steps](#next-steps)
+
+## The pipeline
+
+Raw sensor output is corrected step by step, and the corrected data feeds the orientation filters. Because the true errors are known, every stage can be scored against ground truth.
+
+```mermaid
+flowchart LR
+    S["Simulated MEMS IMU<br/>(scale, misalignment, bias,<br/>thermal drift, noise)"] --> A["Accelerometer<br/>calibration"]
+    S --> G["Gyro calibration<br/>and thermal model"]
+    S --> N["Noise identification<br/>(Allan variance)"]
+    A --> F["Sensor fusion<br/>(5 filters)"]
+    G --> F
+    F --> E["Attitude error<br/>vs. ground truth"]
+```
+
+## Results at a glance
+
+**Calibration cuts the error by one to two orders of magnitude, and, on calibrated data, an adaptive Kalman filter keeps the orientation within 2° even during disturbances.**
+
+| Step | Before | After | Improvement |
+|---|---|---|---|
+| Accelerometer, gravity-norm error on unseen poses (RMS) | 193.2 mm/s² | 1.37 mm/s² (lab) / 1.65 mm/s² (field) | ~140× |
+| Gyro rate error on rate table | 0.3–6 deg/s | 0.003–0.013 deg/s | ~300× |
+| Gyro thermal bias, unseen chamber profile (RMSE) | 130.3 mdeg/s | **2.8 mdeg/s** (neural network) | ~47× |
+| Attitude error after 120 s at 45 °C | 21.85° | **0.34°** (with thermal model) | ~64× |
+| Orientation error during disturbances | up to 19–20° (Mahony, Madgwick) | **1.80°** (adaptive EKF) | ~10× |
+
+Orientation error of all five filters over a 5 minute run, with linear-acceleration bursts (red) and a magnetic disturbance (blue):
+
+![Fusion attitude error](results/fig6_fusion_attitude_error.png)
 
 ## What it covers
 
@@ -28,7 +80,7 @@ Gyroscope: `y = K_g w + b(T, dT/dt) + b_GM + n`
 
 All parameter values are in `src/imu_truth.m` and can be changed to test other sensor grades.
 
-## Results
+## Calibration results
 
 | Step | Before | After | Improvement |
 |---|---|---|---|
@@ -82,6 +134,8 @@ From uncalibrated data, the EKF's online bias estimate converges to [0.621, −0
 
 ## Figures
 
+The orientation error of all five filters is shown under [Results at a glance](#results-at-a-glance).
+
 **Accelerometer calibration:** gravity-magnitude error on unseen orientations (left) and full 3-D error before and after calibration (right).
 
 ![Accelerometer calibration](results/fig1_accel_calibration.png)
@@ -102,10 +156,6 @@ From uncalibrated data, the EKF's online bias estimate converges to [0.621, −0
 
 ![Attitude drift](results/fig5_attitude_drift.png)
 
-**Sensor fusion, attitude error:** orientation error of all five filters on calibrated data. Red bands mark linear-acceleration bursts, the blue band the magnetic disturbance.
-
-![Fusion attitude error](results/fig6_fusion_attitude_error.png)
-
 **Sensor fusion, summary:** raw vs. calibrated sensors in undisturbed periods (left) and during disturbances (right).
 
 ![Fusion summary](results/fig7_fusion_summary.png)
@@ -114,47 +164,70 @@ From uncalibrated data, the EKF's online bias estimate converges to [0.621, −0
 
 ![Bias estimation](results/fig8_bias_estimation.png)
 
-## How to run
+## Quick start
 
-1. Clone or download this repository.
-2. Open MATLAB (R2018b or newer) and set the repository folder as the Current Folder.
-3. Run the calibration first; it saves its results for the fusion step:
+Requires MATLAB R2018b or newer. No toolboxes are needed.
+
+```bash
+git clone https://github.com/Madmaxcoder2612/mems-imu-calibration.git
+cd mems-imu-calibration
+```
+
+Open MATLAB, set the repository folder as the Current Folder, and run the calibration first. It saves its results for the fusion step:
 
 ```matlab
 >> main_mems_calibration
 >> main_sensor_fusion
 ```
 
+Or run both from a terminal without opening the MATLAB desktop (R2019a or newer):
+
+```bash
+matlab -batch "main_mems_calibration; main_sensor_fusion"
+```
+
 The calibration takes under a minute, the fusion comparison 1–2 minutes. Figures are saved to `results/` and a summary is printed to the Command Window. Fixed random seeds make the results reproducible.
 
-## Project structure
+## How it works
 
-```
-main_mems_calibration.m       calibration and identification (steps 1-6)
-main_sensor_fusion.m          orientation filter comparison (step 7)
-src/
-  imu_truth.m                 ground-truth sensor error parameters
-  gyro_thermal_bias.m         thermal bias and hysteresis model
-  gauss_markov.m              bias-instability process
-  calib_linear_lsq.m          12-parameter linear calibration
-  calib_accel_field.m         fixture-free Levenberg-Marquardt calibration
-  make_temp_profile.m         climate-chamber profile with thermal lag
-  sim_thermal_run.m           static gyro inside the chamber
-  mlp_train.m, mlp_predict.m  small neural network trained with Adam
-  allan_deviation.m           overlapping Allan deviation
-  rand_rotation.m, axang2R.m  rotation helpers
-  fusion/
-    sim_fusion_truth.m        motion, disturbances, Earth field
-    filt_gyro_only.m          gyro integration baseline
-    filt_complementary.m      quaternion complementary filter
-    filt_mahony.m             Mahony filter
-    filt_madgwick.m           Madgwick filter
-    filt_mekf.m               adaptive error-state EKF
-    triad_quat.m              orientation from accel + mag
-    attitude_errors.m         error metrics
-    quat_*.m, q2R.m, R2q.m,   quaternion and rotation helpers
-    rot_log.m, skew3.m, ...
-results/                      generated figures
+| File | Role |
+|---|---|
+| [main_mems_calibration.m](main_mems_calibration.m) | Calibration and identification, steps 1–6 |
+| [main_sensor_fusion.m](main_sensor_fusion.m) | Orientation filter comparison, step 7 |
+| [src/imu_truth.m](src/imu_truth.m) | Ground-truth sensor error parameters |
+| [src/fusion/](src/fusion) | Motion and disturbance simulation, the five filters, error metrics |
+
+GitHub Actions runs both scripts in MATLAB on every push and checks that all eight figures are produced.
+
+## Repository layout
+
+```text
+.
+├── main_mems_calibration.m       calibration and identification (steps 1-6)
+├── main_sensor_fusion.m          orientation filter comparison (step 7)
+├── src/
+│   ├── imu_truth.m               ground-truth sensor error parameters
+│   ├── gyro_thermal_bias.m       thermal bias and hysteresis model
+│   ├── gauss_markov.m            bias-instability process
+│   ├── calib_linear_lsq.m        12-parameter linear calibration
+│   ├── calib_accel_field.m       fixture-free Levenberg-Marquardt calibration
+│   ├── make_temp_profile.m       climate-chamber profile with thermal lag
+│   ├── sim_thermal_run.m         static gyro inside the chamber
+│   ├── mlp_train.m, mlp_predict.m  small neural network trained with Adam
+│   ├── allan_deviation.m         overlapping Allan deviation
+│   ├── rand_rotation.m, axang2R.m  rotation helpers
+│   └── fusion/
+│       ├── sim_fusion_truth.m    motion, disturbances, Earth field
+│       ├── filt_gyro_only.m      gyro integration baseline
+│       ├── filt_complementary.m  quaternion complementary filter
+│       ├── filt_mahony.m         Mahony filter
+│       ├── filt_madgwick.m       Madgwick filter
+│       ├── filt_mekf.m           adaptive error-state EKF
+│       ├── triad_quat.m          orientation from accel + mag
+│       ├── attitude_errors.m     error metrics
+│       └── quat_*.m, q2R.m, R2q.m, rot_log.m, skew3.m, ...  helpers
+├── results/                      generated figures and calibration parameters
+└── .github/workflows/            CI
 ```
 
 ## Limitations
@@ -167,11 +240,11 @@ results/                      generated figures
 
 ## Next steps
 
-- Repeat the pipeline with a real sensor (e.g. BMI270 or ICM-42688 on an ESP32) and compare against the simulation.
-- Run the thermal model on the microcontroller itself.
-- Add magnetometer hard/soft-iron calibration (ellipsoid fit).
-- Add an unscented Kalman filter and disturbance detection for Mahony and Madgwick, for a fairer comparison.
+1. Repeat the pipeline with a real sensor (e.g. BMI270 or ICM-42688 on an ESP32) and compare against the simulation.
+2. Run the thermal model on the microcontroller itself.
+3. Add magnetometer hard/soft-iron calibration (ellipsoid fit).
+4. Add an unscented Kalman filter and disturbance detection for Mahony and Madgwick, for a fairer comparison.
 
 ## License
 
-MIT
+[MIT](LICENSE)
