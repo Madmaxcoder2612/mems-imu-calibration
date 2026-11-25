@@ -1,9 +1,9 @@
 # MEMS IMU calibration and system identification (MATLAB)
 
 [![CI](https://github.com/Madmaxcoder2612/mems-imu-calibration/actions/workflows/ci.yml/badge.svg)](https://github.com/Madmaxcoder2612/mems-imu-calibration/actions/workflows/ci.yml)
-![MATLAB R2018b+](https://img.shields.io/badge/MATLAB-R2018b%2B-orange)
-![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![Status: simulation study](https://img.shields.io/badge/status-simulation%20study-orange)
+[![MATLAB R2018b+](https://img.shields.io/badge/MATLAB-R2018b%2B-orange)](https://www.mathworks.com/products/matlab.html)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Status: simulation study](https://img.shields.io/badge/status-simulation%20study-orange)](#limitations)
 
 A simulation study of how a low-cost MEMS IMU is calibrated, characterised and fused into an orientation estimate: from classical least-squares calibration and a neural-network model of thermal drift to a comparison of five orientation filters, including an adaptive Kalman filter.
 
